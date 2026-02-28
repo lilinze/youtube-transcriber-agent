@@ -1,0 +1,11 @@
+name: youtube-transcriber-agent
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - ffmpeg
+  - pip
+  - pip:
+      - youtube-transcript-api>=0.6.2
+      - yt-dlp>=2025.1.26
+      - faster-whisper>=1.1.1

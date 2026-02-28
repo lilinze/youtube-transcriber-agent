@@ -1,0 +1,4 @@
+version: 1
+display_name: YouTube Transcriber
+short_description: Turn YouTube videos into transcript text.
+default_prompt: Convert a YouTube video into text. Prefer existing subtitles, and fall back to speech-to-text when needed.
