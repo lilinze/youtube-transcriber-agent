@@ -11,11 +11,6 @@ function Test-Command {
     return $null -ne (Get-Command $Name -ErrorAction SilentlyContinue)
 }
 
-Write-Host "Checking Python..."
-if (-not (Test-Command "python")) {
-    throw "Python was not found on PATH."
-}
-
 if ($UseConda) {
     if (-not (Test-Command "conda")) {
         throw "Conda was not found on PATH."
@@ -31,6 +26,11 @@ if ($UseConda) {
     Write-Host "Checking Python packages inside conda environment..."
     conda run -n $EnvName python -c "import importlib.util;mods=['youtube_transcript_api','yt_dlp','faster_whisper'];missing=[m for m in mods if importlib.util.find_spec(m) is None];print('Missing: ' + ', '.join(missing) if missing else 'All required Python packages are installed.')"
 } else {
+    Write-Host "Checking Python..."
+    if (-not (Test-Command "python")) {
+        throw "Python was not found on PATH."
+    }
+
     if ($UpgradePip) {
         Write-Host "Upgrading pip..."
         python -m pip install --upgrade pip

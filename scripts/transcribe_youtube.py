@@ -14,6 +14,7 @@ import sys
 import tempfile
 from pathlib import Path
 from typing import Any, Iterable
+from urllib.parse import parse_qs, urlparse
 
 
 def parse_args() -> argparse.Namespace:
@@ -164,10 +165,41 @@ def try_fetch_subtitles(url: str, language: str | None) -> list[dict[str, Any]] 
 
 
 def extract_video_id(url: str) -> str:
-    if "youtu.be/" in url:
-        return url.split("youtu.be/", 1)[1].split("?", 1)[0].split("&", 1)[0]
-    if "v=" in url:
-        return url.split("v=", 1)[1].split("&", 1)[0]
+    parsed = urlparse(url.strip())
+    host = parsed.netloc.lower()
+    path = parsed.path.strip("/")
+
+    if not host:
+        raise ValueError(f"Unsupported YouTube URL: {url}")
+
+    if host in {"youtu.be", "www.youtu.be"}:
+        if path:
+            return path.split("/", 1)[0]
+        raise ValueError(f"Unsupported YouTube URL: {url}")
+
+    if host in {
+        "youtube.com",
+        "www.youtube.com",
+        "m.youtube.com",
+        "music.youtube.com",
+    }:
+        if path == "watch":
+            video_id = parse_qs(parsed.query).get("v", [""])[0]
+            if video_id:
+                return video_id
+        if path.startswith("shorts/"):
+            video_id = path.split("/", 1)[1]
+            if video_id:
+                return video_id
+        if path.startswith("live/"):
+            video_id = path.split("/", 1)[1]
+            if video_id:
+                return video_id
+        if path.startswith("embed/"):
+            video_id = path.split("/", 1)[1]
+            if video_id:
+                return video_id
+
     raise ValueError(f"Unsupported YouTube URL: {url}")
 
 
@@ -213,10 +245,7 @@ def transcribe_with_faster_whisper(
     model: str,
     device: str,
 ) -> list[dict[str, Any]]:
-    try:
-        from faster_whisper import WhisperModel
-    except ImportError as exc:
-        raise RuntimeError from exc
+    from faster_whisper import WhisperModel
 
     model_device = device if device != "auto" else "auto"
     whisper_model = WhisperModel(model, device=model_device, compute_type="auto")
@@ -235,10 +264,7 @@ def transcribe_with_faster_whisper(
 def transcribe_with_openai_whisper(
     audio_path: Path, language: str | None, model: str
 ) -> list[dict[str, Any]]:
-    try:
-        import whisper
-    except ImportError as exc:
-        raise RuntimeError from exc
+    import whisper
 
     whisper_model = whisper.load_model(model)
     result = whisper_model.transcribe(str(audio_path), language=language)
@@ -251,14 +277,14 @@ def transcribe_audio(
     errors: list[str] = []
     try:
         return transcribe_with_faster_whisper(audio_path, language, model, device)
-    except RuntimeError:
+    except ImportError:
         errors.append("faster-whisper unavailable")
     except Exception as exc:
         errors.append(f"faster-whisper failed: {exc}")
 
     try:
         return transcribe_with_openai_whisper(audio_path, language, model)
-    except RuntimeError:
+    except ImportError:
         errors.append("openai-whisper unavailable")
     except Exception as exc:
         errors.append(f"openai-whisper failed: {exc}")
@@ -284,7 +310,7 @@ def write_outputs(
         ensure_parent(json_output)
         json_output.write_text(
             json.dumps(segments, ensure_ascii=False, indent=2),
-            encoding="utf-8-sig",
+            encoding="utf-8",
         )
     if srt_output:
         ensure_parent(srt_output)
